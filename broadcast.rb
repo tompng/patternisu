@@ -1,8 +1,8 @@
 require 'oj'
 require 'redis'
 
-class RedisConnection
-  attr_reader :worker_id
+class Connection
+  attr_reader :worker_id, :redis
   def initialize(&block)
     @worker_id = random_id
     @workers = {}
