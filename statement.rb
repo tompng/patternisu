@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+require 'mysql2'
+
 @statements = {}
 def statement sql
   @statements[sql] ||= db.prepare sql
