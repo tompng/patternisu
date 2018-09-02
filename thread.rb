@@ -19,3 +19,9 @@ def parallel_insert
   @task_queue << [-> { db.xquery 'insert2' }, queue]
   2.times { queue.deq }
 end
+
+def db
+  Thraed.current[:db] ||= new_db_connection
+end
+
+Thread.new { db.do_something_before_fork }
