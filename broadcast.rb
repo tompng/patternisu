@@ -40,8 +40,9 @@ class Connection
 
   def run_broadcast_receive
     subscribe 'data' do |data|
-      message, from, msg_id = Oj.load data
+      message, from, msg_id, include_self = Oj.load data
       response = yield message, from, !!msg_id
+      next if msg_id.nil? || (!include_self && from == @worker_id)
       @redis.publish from, Oj.dump([msg_id, response]) if msg_id
     end
   end
@@ -68,14 +69,15 @@ class Connection
     end
   end
 
-  def broadcast_with_ack message, timeout: 1
+  def broadcast_with_ack message, timeout: 1, include_self: false
     msg_id = random_id
     queue = Queue.new
     @inbox[msg_id] = queue
-    @redis.publish 'data', Oj.dump([message, @worker_id, msg_id])
+    @redis.publish 'data', Oj.dump([message, @worker_id, msg_id, include_self])
     output = []
     Timeout.timeout timeout do
-      live_workers.map do
+      count = include_self ? live_workers.size : live_workers.size - 1
+      count.times do
         output << queue.deq
       end
     end rescue nil
@@ -84,3 +86,5 @@ class Connection
     @inbox[msg_id] = nil
   end
 end
+
+require 'pry';binding.pry
