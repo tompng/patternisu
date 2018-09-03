@@ -10,8 +10,7 @@ class Connection
     @inbox = {}
     Thread.new { run_ping }
     Thread.new { run_ping_receive }
-    Thread.new { run_broadcast_receive(&block) }
-    Thread.new { run_inbox_receive }
+    Thread.new { run_receive(&block) }
   end
 
   def random_id
@@ -19,7 +18,7 @@ class Connection
   end
 
   def run_ping_receive
-    subscribe 'ping' do |worker_id|
+    subscribe 'ping' do |_, worker_id|
       time = Time.now
       @workers[worker_id] = time
       @workers = @workers.select { |_, t| t > time - 3 }
@@ -38,35 +37,52 @@ class Connection
     end
   end
 
-  def run_broadcast_receive
-    subscribe 'data' do |data|
-      message, from, msg_id, include_self = Oj.load data
-      response = yield message, from, !!msg_id
-      next if msg_id.nil? || (!include_self && from == @worker_id)
-      @redis.publish from, Oj.dump([msg_id, response]) if msg_id
+  def run_receive
+    subscribe 'data', @worker_id do |type, data|
+      if type == 'data'
+        message, from, msg_id, include_self = Oj.load data
+        response = yield message, from, !!msg_id
+        next if msg_id.nil? || (!include_self && from == @worker_id)
+        @redis.publish from, Oj.dump([response, @worker_id, msg_id, true]) if msg_id
+      else
+        message, from, msg_id, is_reply = Oj.load data
+        if is_reply
+          box = @inbox[msg_id]
+          box << [from, message] if box
+        else
+          response = yield message, from, !!msg_id
+          @redis.publish from, Oj.dump([response, @worker_id, msg_id, true]) if msg_id
+        end
+      end
     end
   end
 
-  def run_inbox_receive
-    subscribe @worker_id do |message|
-      msg_id, response = Oj.load message
-      box = @inbox[msg_id]
-      box << response if box
+  def subscribe *keys
+    Thread.new do
+      Redis.new.subscribe(*keys) do |on|
+        on.message do |key, message|
+          yield key, message
+        end
+      end
     end
+  end
+
+  def send message, to:
+    @redis.publish to, Oj.dump([message, @worker_id, nil, false])
+  end
+
+  def send_with_ack message, to:, timeout: 1
+    msg_id = random_id
+    queue = Queue.new
+    @inbox[msg_id] = queue
+    @redis.publish to, Oj.dump([message, @worker_id, msg_id, false])
+    Timeout.timeout timeout do
+      queue.deq.last
+    end rescue nil
   end
 
   def broadcast message
     @redis.publish 'data', Oj.dump([message, @worker_id])
-  end
-
-  def subscribe key, &block
-    Thread.new do
-      Redis.new.subscribe key do |on|
-        on.message do |_, message|
-          block.call message
-        end
-      end
-    end
   end
 
   def broadcast_with_ack message, timeout: 1, include_self: false
@@ -77,11 +93,9 @@ class Connection
     output = []
     Timeout.timeout timeout do
       count = include_self ? live_workers.size : live_workers.size - 1
-      count.times do
-        output << queue.deq
-      end
+      count.times { output << queue.deq }
     end rescue nil
-    output
+    output.to_h
   ensure
     @inbox[msg_id] = nil
   end
