@@ -27,3 +27,15 @@ redis.publish 'comments_changed', Oj.dump(id: comment_id, body: comment_body)
 # redis aggregate pattern
 redis.set "last_comment_id_#{worker_id}", last_comment_id
 last_comment_id = redis.mget(worker_ids.map { |id| "last_comment_id_#{id}" }).map(&:to_i).max
+
+# third normal form
+Comment.attribute_names #=> %w[user_id post_id body] # too large to cache on memory
+Comment.attribute_names #=> %w[user_id post_id body_id] # can cache on memory
+CommentBody.attribute_names #=> %w[id body] # unique_index on body
+def id_from_comment_body body
+  @id_from_comment_body[body] ||= begin
+    CommentBody.create(body: body).id
+  rescue
+    CommentBody.where(body: body).first.id
+  end
+end
