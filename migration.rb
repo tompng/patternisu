@@ -6,3 +6,4 @@ connection.add_index :comments, [:post_id, :user_id], unique: true
 connection.execute 'alter table comments character set utf8'
 connection.remove_column :comments, :post_id
 connection.drop_table :comments
+connection.indexes :comments
