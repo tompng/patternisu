@@ -14,7 +14,7 @@ class Connection
   end
 
   def random_id
-    rand(0xffffff).to_s(16)
+    rand(0xffffffff).to_s(16)
   end
 
   def run_ping_receive
@@ -97,7 +97,7 @@ class Connection
     end rescue nil
     output.to_h
   ensure
-    @inbox[msg_id] = nil
+    @inbox.detele msg_id
   end
 end
 
