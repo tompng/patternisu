@@ -99,7 +99,7 @@ class Connection
     end rescue nil
     output.to_h
   ensure
-    @inbox.detele msg_id
+    @inbox.delete msg_id
   end
 end
 
