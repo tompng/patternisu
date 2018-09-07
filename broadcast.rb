@@ -79,6 +79,8 @@ class Connection
     Timeout.timeout timeout do
       queue.deq.last
     end rescue nil
+  ensure
+    @inbox.delete msg_id
   end
 
   def broadcast message
