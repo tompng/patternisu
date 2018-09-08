@@ -3,8 +3,8 @@ require 'redis'
 
 class Connection
   attr_reader :worker_id, :redis
-  def initialize(&block)
-    @worker_id = random_id
+  def initialize(name: nil, &block)
+    @worker_id = name || random_id
     @workers = {}
     @redis = Redis.new
     @inbox = {}
