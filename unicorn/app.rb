@@ -1,7 +1,7 @@
 require 'sinatra/base'
 Thread.new do
   p :before_fork
-end
+end.join
 
 class WebApp < Sinatra::Base
   def initialize

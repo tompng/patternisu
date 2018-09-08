@@ -24,4 +24,4 @@ def db
   Thraed.current[:db] ||= new_db_connection
 end
 
-Thread.new { db.do_something_before_fork }
+Thread.new { db.do_something_before_fork }.join
