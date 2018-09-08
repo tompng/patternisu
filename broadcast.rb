@@ -23,6 +23,10 @@ class Connection
       @workers[worker_id] = time
       @workers = @workers.select { |_, t| t > time - 3 }
     end
+  rescue StandardError => e
+    puts e
+    sleep 1
+    retry
   end
 
   def live_workers
@@ -32,7 +36,7 @@ class Connection
 
   def run_ping
     loop do
-      @redis.publish 'ping', @worker_id
+      @redis.publish 'ping', @worker_id rescue nil
       sleep 1
     end
   end
@@ -55,14 +59,16 @@ class Connection
         end
       end
     end
+  rescue StandardError => e
+    puts e
+    sleep 1
+    retry
   end
 
   def subscribe *keys
-    Thread.new do
-      Redis.new.subscribe(*keys) do |on|
-        on.message do |key, message|
-          yield key, message
-        end
+    Redis.new.subscribe(*keys) do |on|
+      on.message do |key, message|
+        yield key, message
       end
     end
   end
