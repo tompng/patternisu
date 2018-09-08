@@ -7,14 +7,28 @@ class Connection
     @worker_id = name || random_id
     @workers = {}
     @redis = Redis.new
+    @publish_queue = Queue.new
     @inbox = {}
     Thread.new { run_ping }
     Thread.new { run_ping_receive }
     Thread.new { run_receive(&block) }
+    Thread.new { run_async_publish }
   end
 
   def random_id
     rand(0xffffffff).to_s(16)
+  end
+
+  def async_publish channel, data
+    @publish_queue << [channel, data]
+    nil
+  end
+
+  def run_async_publish
+    loop do
+      channel, data = @publish_queue.deq
+      @redis.publish channel, data rescue nil
+    end
   end
 
   def run_ping_receive
@@ -45,8 +59,9 @@ class Connection
     subscribe 'data', @worker_id do |type, data|
       if type == 'data'
         message, from, msg_id, include_self = Oj.load data
+        next if !include_self && from == @worker_id
         response = yield message, from, !!msg_id
-        next if msg_id.nil? || (!include_self && from == @worker_id)
+        next if msg_id.nil?
         @redis.publish from, Oj.dump([response, @worker_id, msg_id, true]) if msg_id
       else
         message, from, msg_id, is_reply = Oj.load data
@@ -74,7 +89,7 @@ class Connection
   end
 
   def send message, to:
-    @redis.publish to, Oj.dump([message, @worker_id, nil, false])
+    async_publish to, Oj.dump([message, @worker_id, nil, false])
   end
 
   def send_with_ack message, to:, timeout: 1
@@ -89,8 +104,8 @@ class Connection
     @inbox.delete msg_id
   end
 
-  def broadcast message
-    @redis.publish 'data', Oj.dump([message, @worker_id])
+  def broadcast message, include_self: false
+    async_publish 'data', Oj.dump([message, @worker_id, nil, include_self])
   end
 
   def broadcast_with_ack message, timeout: 1, include_self: false
