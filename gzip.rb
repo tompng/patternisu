@@ -2,7 +2,7 @@ require 'sinatra'
 require 'zlib'
 require 'pry'
 get '/' do
-  cache_control 'public'
+  cache_control 'public, max-age=3600'
   time = Time.now.to_i
   last_modified Time.at time
   etag time.to_s
