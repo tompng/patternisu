@@ -1,7 +1,7 @@
 # unicorn -c unicorn_config.rb
 worker_processes 2
 preload_app true
-pid './unicorn.pid'
+# pid './unicorn.pid'
 listen 8080
 
 $worker_id = 0
