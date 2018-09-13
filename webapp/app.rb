@@ -11,7 +11,7 @@ end.join
 class WebApp < Sinatra::Base
   def initialize
     super
-    p :initialized
+    p [:initialized, $worker_id]
     @aaa = rand
   end
 
