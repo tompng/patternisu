@@ -1,5 +1,10 @@
 require 'sinatra/base'
+
 Thread.new do
+  # wait_for_db
+  # wait_for_redis host: 'localhost'
+  # wait_for_redis host: '12.34.56.67'
+  # wait_for_redis host: '23.45.67.89'
   p :before_fork
 end.join
 
