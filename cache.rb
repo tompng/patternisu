@@ -20,6 +20,19 @@ db.xquery(
 )
 redis.set 'last_changes_id', db.last_id
 
+# redis changes list pattern
+changes_index = 0
+post '/update' do
+  db.xquery('update users ...', id)
+  redis.rpush 'changes', Oj.dump(['users', id])
+end
+get '/' do
+  idx = changes_index
+  changes = redis.lrange 'changes', idx, -1
+  changes.each { |data| read_from_db_and_cache_to_memory data }
+  changes_index = idx + changes.size
+end
+
 # broadcast pattern
 db.xquery 'update comments set body = ? where id = ?', comment_body, comment_id
 redis.publish 'comments_changed', Oj.dump(id: comment_id, body: comment_body)
